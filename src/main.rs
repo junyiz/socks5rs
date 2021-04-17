@@ -9,7 +9,9 @@ fn main() {
     let listener = TcpListener::bind("0.0.0.0:10080").unwrap();
     for stream in listener.incoming() {
         let stream = stream.unwrap();
-        handle_connection(stream);
+        thread::spawn(move || {
+            handle_connection(stream);
+        });
     }
 }
 
@@ -39,7 +41,20 @@ fn handle_connection(stream: TcpStream) {
             tmp_array.copy_from_slice(&buffer[0..4]);
             let ipv4 = Ipv4Addr::from(tmp_array);
             let socket = SocketAddrV4::new(ipv4, 0x1BB);
+            println!("ipv4 port: {} * 256 + {}", buffer[4], buffer[5]);
             addr_port = format!("{}", socket);
+            println!("ipv4: {}", addr_port);
+        }
+        0x03 => {
+            // DOMAINNAME
+            reader.read_exact(&mut buffer[0..1]).unwrap();
+            let len = buffer[0] as usize;
+            reader.read_exact(&mut buffer[0..len + 2]).unwrap();
+            println!("domain port: {} * 256 + {}", buffer[len], buffer[len + 1]);
+            if let Ok(addr) = std::str::from_utf8(&buffer[0..len]) {
+                addr_port = format!("{}:{}", addr, 0x1BB);
+            }
+            println!("domain: {}", addr_port);
         }
         0x04 => {
             // ipv6
@@ -47,9 +62,10 @@ fn handle_connection(stream: TcpStream) {
             let mut tmp_array: [u8; 16] = Default::default();
             tmp_array.copy_from_slice(&buffer[0..16]);
             let ipv6 = Ipv6Addr::from(tmp_array);
+            println!("domain port: {} * 256 + {}", buffer[16], buffer[17]);
             let socket = SocketAddrV6::new(ipv6, 0x1BB, 0, 0);
             addr_port = format!("{}", socket);
-
+            println!("ipv6: {}", addr_port);
         }
         _ => {
             // nothing

@@ -3,7 +3,8 @@ use std::thread;
 use std::io::prelude::*;
 use std::net::TcpStream;
 use std::net::TcpListener;
-use std::net::{Ipv4Addr,Ipv6Addr,SocketAddrV6,SocketAddrV4};
+use std::net::{Ipv4Addr,Ipv6Addr,SocketAddrV6,SocketAddrV4,Shutdown};
+use std::time::Duration;
 
 fn main() {
     let listener = TcpListener::bind("0.0.0.0:10080").unwrap();
@@ -75,14 +76,20 @@ fn handle_connection(stream: TcpStream) {
     match cmd {
         0x01 => {
             if let Ok(socket) = TcpStream::connect(addr_port.as_str()) {
+                // send connect success
                 writer.write(&[0x05u8, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,]).unwrap();
                 let mut remote_reader = socket.try_clone().unwrap();
                 let mut remote_writer = socket;
                 thread::spawn(move || {
                     io::copy(&mut reader, &mut remote_writer).unwrap();
+                    thread::sleep(Duration::from_secs(30));
+                    reader.shutdown(Shutdown::Both).unwrap();
+                    remote_writer.shutdown(Shutdown::Both).unwrap();
                 });
                 io::copy(&mut remote_reader, &mut writer).unwrap();
-
+                thread::sleep(Duration::from_secs(30));
+                remote_reader.shutdown(Shutdown::Both).unwrap();
+                writer.shutdown(Shutdown::Both).unwrap();
             } else {
                 println!("cannot connect {}", addr_port);
             }

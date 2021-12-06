@@ -11,7 +11,7 @@ use bytes::Buf;
 // https://aber.sh/articles/Socks5/
 
 fn main() {
-    let listener = TcpListener::bind("0.0.0.0:1080").unwrap();
+    let listener = TcpListener::bind("0.0.0.0:10080").unwrap();
     for stream in listener.incoming() {
         let stream = stream.unwrap();
         thread::spawn(move || {
@@ -36,7 +36,7 @@ fn handle_connection(stream: TcpStream) {
     // +-----+----------+----------+
 
     // read socks5 header
-    reader.read_exact(&mut buffer[0..2]).unwrap();
+    reader.read_exact(&mut buffer[0..2]).unwrap(); // read VER and NMETHODS
     if buffer[0] != 0x05 {
        // TODO tips: 
        // only socks5 protocol is supported
@@ -44,7 +44,7 @@ fn handle_connection(stream: TcpStream) {
 
     let methods = buffer[1] as usize;
     println!("methods {}", methods);
-    reader.read_exact(&mut buffer[0..methods]).unwrap();
+    reader.read_exact(&mut buffer[0..methods]).unwrap(); // read METHODS
 
     // TODO tips:
     // only no-auth is supported
@@ -67,7 +67,7 @@ fn handle_connection(stream: TcpStream) {
     // | 1  |  1  | X'00' |  1   | Variable |    2     |
     // +----+-----+-------+------+----------+----------+
 
-    // read socks5 cmd
+    // read socks5 VER/CMD/RSV/ATYP
     reader.read_exact(&mut buffer[0..4]).unwrap();
     let cmd = buffer[1];
     let atyp = buffer[3];

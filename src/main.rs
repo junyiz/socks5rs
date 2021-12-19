@@ -4,8 +4,12 @@ use std::io::prelude::*;
 use std::net::TcpStream;
 use std::net::TcpListener;
 use std::net::{Ipv4Addr,Ipv6Addr,SocketAddrV6,SocketAddrV4,Shutdown};
-use std::time::Duration;
 use bytes::Buf;
+
+fn log<T: Display>(color: &str, text: &str, err: T) {
+    // https://gist.github.com/fnky/458719343aabd01cfb17a3a4f7296797
+    println!("\x1b[0;{}m{}\x1b[0m: {}", color, text, err);
+}
 
 // https://datatracker.ietf.org/doc/html/rfc1928
 // https://aber.sh/articles/Socks5/
@@ -125,15 +129,31 @@ fn handle_connection(stream: TcpStream) {
                 let mut remote_reader = socket.try_clone().unwrap();
                 let mut remote_writer = socket;
                 thread::spawn(move || {
-                    io::copy(&mut reader, &mut remote_writer).unwrap();
-                    thread::sleep(Duration::from_secs(30));
-                    reader.shutdown(Shutdown::Both).unwrap();
-                    remote_writer.shutdown(Shutdown::Both).unwrap();
+                    match io::copy(&mut reader, &mut remote_writer) {
+                        Ok(len) => {
+                            log("1", "local>remote", len);
+                            reader.shutdown(Shutdown::Both).unwrap_or_else(|err| {
+                                log("31", "reader", err);
+                            });
+                            remote_writer.shutdown(Shutdown::Both).unwrap_or_else(|err| {
+                                log("32", "remote_writer", err);
+                            });
+                        },
+                        Err(err) => log("7", "local>remote error", err)
+                    }
                 });
-                io::copy(&mut remote_reader, &mut writer).unwrap();
-                thread::sleep(Duration::from_secs(30));
-                remote_reader.shutdown(Shutdown::Both).unwrap();
-                writer.shutdown(Shutdown::Both).unwrap();
+                match io::copy(&mut remote_reader, &mut writer) {
+                    Ok(len) => {
+                        log("47", "remote>local", len);
+                        remote_reader.shutdown(Shutdown::Both).unwrap_or_else(|err| {
+                            log("33", "remote_reader", err);
+                        });
+                        writer.shutdown(Shutdown::Both).unwrap_or_else(|err| {
+                            log("35", "writer", err);
+                        });
+                    },
+                    Err(err) => log("43", "remote>local error", err)
+                }
             } else {
                 println!("cannot connect {}", addr_port);
             }

@@ -1,5 +1,6 @@
 use std::io;
 use std::thread;
+use std::fmt::Display;
 use std::io::prelude::*;
 use std::net::TcpStream;
 use std::net::TcpListener;

@@ -149,10 +149,10 @@ fn handle_connection(stream: TcpStream) {
                     match io::copy(&mut reader, &mut remote_writer) {
                         Ok(len) => {
                             log("1", "local>remote", len);
-                            reader.shutdown(Shutdown::Both).unwrap_or_else(|err| {
+                            reader.shutdown(Shutdown::Read).unwrap_or_else(|err| {
                                 log("31", "reader", err);
                             });
-                            remote_writer.shutdown(Shutdown::Both).unwrap_or_else(|err| {
+                            remote_writer.shutdown(Shutdown::Write).unwrap_or_else(|err| {
                                 log("32", "remote_writer", err);
                             });
                         },
@@ -162,10 +162,10 @@ fn handle_connection(stream: TcpStream) {
                 match io::copy(&mut remote_reader, &mut writer) {
                     Ok(len) => {
                         log("47", "remote>local", len);
-                        remote_reader.shutdown(Shutdown::Both).unwrap_or_else(|err| {
+                        remote_reader.shutdown(Shutdown::Read).unwrap_or_else(|err| {
                             log("33", "remote_reader", err);
                         });
-                        writer.shutdown(Shutdown::Both).unwrap_or_else(|err| {
+                        writer.shutdown(Shutdown::Write).unwrap_or_else(|err| {
                             log("35", "writer", err);
                         });
                     },

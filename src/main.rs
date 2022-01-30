@@ -1,4 +1,5 @@
 use std::io;
+use std::env;
 use std::thread;
 use std::fmt::Display;
 use std::io::prelude::*;
@@ -16,12 +17,27 @@ fn log<T: Display>(color: &str, text: &str, err: T) {
 // https://aber.sh/articles/Socks5/
 
 fn main() {
-    let listener = TcpListener::bind("0.0.0.0:10080").unwrap();
-    for stream in listener.incoming() {
-        let stream = stream.unwrap();
-        thread::spawn(move || {
-            handle_connection(stream);
-        });
+    let args: Vec<String> = env::args().collect();
+    if args.len() < 2 {
+        println!("usage: sis port");
+        return;
+    }
+    let port = &args[1];
+    let mut addr = String::from("0.0.0.0:");
+    addr.push_str(port);
+    match TcpListener::bind(&addr) {
+        Ok(listener) => {
+            println!("sis is running {}", &addr);
+            for stream in listener.incoming() {
+                let stream = stream.unwrap();
+                thread::spawn(move || {
+                    handle_connection(stream);
+                });
+            }
+        }
+        Err(e) => {
+            println!("{}", e);
+        }
     }
 }
 

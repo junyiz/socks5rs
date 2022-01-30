@@ -1,5 +1,5 @@
 [package]
-name = "socksserver"
+name = "sis"
 version = "0.1.0"
 authors = ["junyiz <junyime@qq.com>"]
 edition = "2021"

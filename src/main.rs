@@ -141,7 +141,7 @@ fn handle_connection(stream: TcpStream) {
                 // | 1  |  1  | X'00' |  1   | Variable |    2     |
                 // +----+-----+-------+------+----------+----------+
                 writer
-                    .write(&[0x05u8, 0x00, 0x00, atyp, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
+                    .write(&[0x05u8, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
                     .unwrap();
                 let mut remote_reader = socket.try_clone().unwrap();
                 let mut remote_writer = socket;

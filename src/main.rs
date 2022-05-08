@@ -1,12 +1,12 @@
-use std::io;
-use std::env;
-use std::thread;
-use std::fmt::Display;
-use std::io::prelude::*;
-use std::net::TcpStream;
-use std::net::TcpListener;
-use std::net::{Ipv4Addr,Ipv6Addr,SocketAddrV6,SocketAddrV4,Shutdown};
 use bytes::Buf;
+use std::env;
+use std::fmt::Display;
+use std::io;
+use std::io::prelude::*;
+use std::net::TcpListener;
+use std::net::TcpStream;
+use std::net::{Ipv4Addr, Ipv6Addr, Shutdown, SocketAddrV4, SocketAddrV6};
+use std::thread;
 
 fn log<T: Display>(color: &str, text: &str, err: T) {
     // https://gist.github.com/fnky/458719343aabd01cfb17a3a4f7296797
@@ -47,7 +47,6 @@ fn handle_connection(stream: TcpStream) {
 
     let mut buffer = vec![0u8; 512];
 
-
     // The client connects to the server, and sends a version
     // identifier/method selection message:
     // +-----+----------+----------+
@@ -59,8 +58,8 @@ fn handle_connection(stream: TcpStream) {
     // read socks5 header
     reader.read_exact(&mut buffer[0..2]).unwrap(); // read VER and NMETHODS
     if buffer[0] != 0x05 {
-       // TODO tips: 
-       // only socks5 protocol is supported
+        // TODO tips:
+        // only socks5 protocol is supported
     }
 
     let methods = buffer[1] as usize;
@@ -71,9 +70,8 @@ fn handle_connection(stream: TcpStream) {
     // only no-auth is supported
 
     // server send to client accepted auth method (0x00 no-auth only yet)
-    writer.write(&[0x05u8, 0x00]).unwrap();       
+    writer.write(&[0x05u8, 0x00]).unwrap();
     writer.flush().unwrap();
-
 
     // Once the method-dependent subnegotiation has completed, the client
     // sends the request details.  If the negotiated method includes
@@ -81,7 +79,7 @@ fn handle_connection(stream: TcpStream) {
     // confidentiality, these requests MUST be encapsulated in the method-
     // dependent encapsulation.
 
-   // The SOCKS request is formed as follows:
+    // The SOCKS request is formed as follows:
     // +----+-----+-------+------+----------+----------+
     // |VER | CMD |  RSV  | ATYP | DST.ADDR | DST.PORT |
     // +----+-----+-------+------+----------+----------+
@@ -102,8 +100,8 @@ fn handle_connection(stream: TcpStream) {
             tmp_array.copy_from_slice(&buffer[0..4]);
             let ipv4 = Ipv4Addr::from(tmp_array);
             let port: u16 = buffer[4..6].as_ref().get_u16();
-            let socket = SocketAddrV4::new(ipv4, port);
-            addr_port = format!("{}", socket);
+            let socket_addr_v4 = SocketAddrV4::new(ipv4, port);
+            addr_port = format!("{}", socket_addr_v4);
             println!("ipv4: {}", addr_port);
         }
         0x03 => {
@@ -124,15 +122,15 @@ fn handle_connection(stream: TcpStream) {
             tmp_array.copy_from_slice(&buffer[0..16]);
             let ipv6 = Ipv6Addr::from(tmp_array);
             let port = buffer[16..18].as_ref().get_u16();
-            let socket = SocketAddrV6::new(ipv6, port, 0, 0);
-            addr_port = format!("{}", socket);
+            let socket_addr_v6 = SocketAddrV6::new(ipv6, port, 0, 0);
+            addr_port = format!("{}", socket_addr_v6);
             println!("ipv6: {}", addr_port);
         }
         _ => {
             // nothing
         }
     }
-    
+
     match cmd {
         0x01 => {
             if let Ok(socket) = TcpStream::connect(addr_port.as_str()) {
@@ -142,34 +140,38 @@ fn handle_connection(stream: TcpStream) {
                 // +----+-----+-------+------+----------+----------+
                 // | 1  |  1  | X'00' |  1   | Variable |    2     |
                 // +----+-----+-------+------+----------+----------+
-                writer.write(&[0x05u8, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,]).unwrap();
+                writer
+                    .write(&[0x05u8, 0x00, 0x00, atyp, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
+                    .unwrap();
                 let mut remote_reader = socket.try_clone().unwrap();
                 let mut remote_writer = socket;
-                thread::spawn(move || {
-                    match io::copy(&mut reader, &mut remote_writer) {
-                        Ok(len) => {
-                            log("1", "local>remote", len);
-                            reader.shutdown(Shutdown::Read).unwrap_or_else(|err| {
-                                log("31", "reader", err);
-                            });
-                            remote_writer.shutdown(Shutdown::Write).unwrap_or_else(|err| {
+                thread::spawn(move || match io::copy(&mut reader, &mut remote_writer) {
+                    Ok(len) => {
+                        log("1", "local>remote", len);
+                        reader.shutdown(Shutdown::Read).unwrap_or_else(|err| {
+                            log("31", "reader", err);
+                        });
+                        remote_writer
+                            .shutdown(Shutdown::Write)
+                            .unwrap_or_else(|err| {
                                 log("32", "remote_writer", err);
                             });
-                        },
-                        Err(err) => log("7", "local>remote error", err)
                     }
+                    Err(err) => log("7", "local>remote error", err),
                 });
                 match io::copy(&mut remote_reader, &mut writer) {
                     Ok(len) => {
                         log("47", "remote>local", len);
-                        remote_reader.shutdown(Shutdown::Read).unwrap_or_else(|err| {
-                            log("33", "remote_reader", err);
-                        });
+                        remote_reader
+                            .shutdown(Shutdown::Read)
+                            .unwrap_or_else(|err| {
+                                log("33", "remote_reader", err);
+                            });
                         writer.shutdown(Shutdown::Write).unwrap_or_else(|err| {
                             log("35", "writer", err);
                         });
-                    },
-                    Err(err) => log("43", "remote>local error", err)
+                    }
+                    Err(err) => log("43", "remote>local error", err),
                 }
             } else {
                 println!("cannot connect {}", addr_port);

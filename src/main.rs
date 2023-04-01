@@ -96,9 +96,9 @@ fn handle_connection(stream: TcpStream) {
         0x01 => {
             // ipv4(4bytes) + port(2bytes)
             reader.read_exact(&mut buffer[0..6]).unwrap();
-            let mut tmp_array: [u8; 4] = Default::default();
-            tmp_array.copy_from_slice(&buffer[0..4]);
-            let ipv4 = Ipv4Addr::from(tmp_array);
+            let mut array: [u8; 4] = Default::default();
+            array.copy_from_slice(&buffer[0..4]);
+            let ipv4 = Ipv4Addr::from(array);
             let port: u16 = buffer[4..6].as_ref().get_u16();
             let socket_addr_v4 = SocketAddrV4::new(ipv4, port);
             addr_port = format!("{}", socket_addr_v4);
@@ -118,9 +118,9 @@ fn handle_connection(stream: TcpStream) {
         0x04 => {
             // ipv6(16bytes) + port(2bytes)
             reader.read_exact(&mut buffer[0..18]).unwrap();
-            let mut tmp_array: [u8; 16] = Default::default();
-            tmp_array.copy_from_slice(&buffer[0..16]);
-            let ipv6 = Ipv6Addr::from(tmp_array);
+            let mut array: [u8; 16] = Default::default();
+            array.copy_from_slice(&buffer[0..16]);
+            let ipv6 = Ipv6Addr::from(array);
             let port = buffer[16..18].as_ref().get_u16();
             let socket_addr_v6 = SocketAddrV6::new(ipv6, port, 0, 0);
             addr_port = format!("{}", socket_addr_v6);

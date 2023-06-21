@@ -1,5 +1,4 @@
 use std::env;
-use std::io;
 use std::io::prelude::*;
 use std::net::TcpListener;
 use std::net::TcpStream;
@@ -137,21 +136,48 @@ fn handle_connection(stream: TcpStream) {
 
     let dst = parse_dst(&mut reader, atyp);
 
-    if let Ok(socket) = TcpStream::connect(dst.as_str()) {
-        // send connect success
-        // +----+-----+-------+------+----------+----------+
-        // |VER | REP |  RSV  | ATYP | BND.ADDR | BND.PORT |
-        // +----+-----+-------+------+----------+----------+
-        // | 1  |  1  | X'00' |  1   | Variable |    2     |
-        // +----+-----+-------+------+----------+----------+
-        writer
-            .write(&[0x05u8, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
-            .unwrap();
-        let mut remote_reader = socket.try_clone().unwrap();
-        let mut remote_writer = socket;
-        thread::spawn(move || io::copy(&mut reader, &mut remote_writer).ok());
-        io::copy(&mut remote_reader, &mut writer).ok();
-    } else {
-        println!("cannot connect {}", dst);
+    match TcpStream::connect(dst.as_str()) {
+        Ok(socket) => {
+            // send connect success
+            // +----+-----+-------+------+----------+----------+
+            // |VER | REP |  RSV  | ATYP | BND.ADDR | BND.PORT |
+            // +----+-----+-------+------+----------+----------+
+            // | 1  |  1  | X'00' |  1   | Variable |    2     |
+            // +----+-----+-------+------+----------+----------+
+            writer
+                .write(&[0x05u8, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
+                .unwrap();
+            let mut remote_reader = socket.try_clone().unwrap();
+            let mut remote_writer = socket;
+            thread::spawn(move || {
+                let mut buf = vec![0; 1024];
+                loop {
+                    match reader.read(&mut buf) {
+                        Ok(0) => return,  
+                        Ok(n) => {
+                            remote_writer.write(&buf[..n]).unwrap();
+                        }
+                        Err(e) => {
+                            println!("reader error: {e:?}");
+                        }
+                    }
+                }
+            });
+            let mut buf = vec![0; 1024];
+            loop {
+                match remote_reader.read(&mut buf) {
+                  Ok(0) => return,  
+                  Ok(n) => {
+                    writer.write(&buf[..n]).unwrap();
+                  }
+                  Err(e) => {
+                    println!("remote reader error: {e:?}");
+                  }
+                }
+            }
+        }
+        Err(e) => {
+            println!("cannot connect {e:?}");
+        }
     }
 }

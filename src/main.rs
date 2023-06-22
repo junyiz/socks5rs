@@ -1,8 +1,6 @@
 use std::env;
 use std::io::prelude::*;
-use std::net::TcpListener;
-use std::net::TcpStream;
-use std::net::{Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6};
+use std::net::{TcpListener, TcpStream, Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6};
 use std::thread;
 
 // SOCKS Protocol Version 5
@@ -21,14 +19,18 @@ fn main() {
         Ok(listener) => {
             println!("socks5rs is running {}", &addr);
             for stream in listener.incoming() {
-                let stream = stream.unwrap();
-                thread::spawn(move || {
-                    handle_connection(stream);
-                });
+                match stream {
+                    Ok(stream) => {
+                        thread::spawn(move || handle_connection(stream));
+                    }
+                    Err(e) => {
+                        println!("Error accepting client connection: {}", e);
+                    }
+                }
             }
         }
         Err(e) => {
-            println!("{}", e);
+            println!("Error bind {} {}", &addr, e);
         }
     }
 }
@@ -54,7 +56,7 @@ fn handshake(reader: &mut TcpStream, writer: &mut TcpStream) {
     reader.read_exact(&mut buffer[0..methods]).unwrap(); // read METHODS
 
     // server send to client accepted auth method (0x00 no-auth only yet)
-    writer.write(&[0x05u8, 0x00]).unwrap();
+    writer.write_all(&[0x05u8, 0x00]).unwrap();
     writer.flush().unwrap();
 }
 
@@ -144,8 +146,9 @@ fn handle_connection(stream: TcpStream) {
             // +----+-----+-------+------+----------+----------+
             // | 1  |  1  | X'00' |  1   | Variable |    2     |
             // +----+-----+-------+------+----------+----------+
+            let response = [0x05u8, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
             writer
-                .write(&[0x05u8, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
+                .write_all(&response)
                 .unwrap();
             let mut remote_reader = socket.try_clone().unwrap();
             let mut remote_writer = socket;
@@ -155,7 +158,7 @@ fn handle_connection(stream: TcpStream) {
                     match reader.read(&mut buf) {
                         Ok(0) => return, // With TcpStream instances, this signifies that the read half of the socket is closed.
                         Ok(n) => {
-                            remote_writer.write(&buf[..n]).unwrap();
+                            remote_writer.write_all(&buf[..n]).unwrap();
                         }
                         Err(e) => {
                             println!("reader error: {e:?}");
@@ -163,12 +166,14 @@ fn handle_connection(stream: TcpStream) {
                     }
                 }
             });
+
+            // Handle remote server -> client traffic
             let mut buf = vec![0; 1024];
             loop {
                 match remote_reader.read(&mut buf) {
                   Ok(0) => return,  
                   Ok(n) => {
-                    writer.write(&buf[..n]).unwrap();
+                    writer.write_all(&buf[..n]).unwrap();
                   }
                   Err(e) => {
                     println!("remote reader error: {e:?}");

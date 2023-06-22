@@ -1,4 +1,4 @@
-use std::env;
+use std::{env, io};
 use std::io::prelude::*;
 use std::net::{TcpListener, TcpStream, Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6};
 use std::thread;
@@ -35,8 +35,8 @@ fn main() {
     }
 }
 
-fn handshake(reader: &mut TcpStream, writer: &mut TcpStream) {
-    let mut buffer = vec![0u8; 512];
+fn handshake(reader: &mut TcpStream, writer: &mut TcpStream) -> io::Result<()> {
+    let mut buffer = vec![0u8; 258];
 
     // The client connects to the server, and sends a version
     // identifier/method selection message:
@@ -47,17 +47,33 @@ fn handshake(reader: &mut TcpStream, writer: &mut TcpStream) {
     // +-----+----------+----------+
 
     // read socks5 header
-    reader.read_exact(&mut buffer[0..2]).unwrap(); // read VER and NMETHODS
-    if buffer[0] != 0x05 {
-        panic!("only socks5 protocol is supported");
+    match reader.read(&mut buffer) {
+        Ok(n) => {
+            let ver = buffer[0];
+            let nmethods = buffer[1] as usize;
+            let methods = &buffer[2..n];
+            let length = methods.len();
+            println!("n = {n}, ver = {ver}, nmethods = {nmethods}, methods length = {length}");
+            if ver != 5 {
+                return Err(io::Error::new(io::ErrorKind::Other, "not supported ver = {ver}"));
+            }
+            let response = [5, 0];
+            writer.write_all(&response)
+        }
+        Err(e) => {
+            Err(e)
+        }
     }
+    // if buffer[0] != 0x05 {
+    //     panic!("only socks5 protocol is supported");
+    // }
 
-    let methods = buffer[1] as usize;
-    reader.read_exact(&mut buffer[0..methods]).unwrap(); // read METHODS
+    // let methods = buffer[1] as usize;
+    // reader.read_exact(&mut buffer[0..methods]).unwrap(); // read METHODS
 
-    // server send to client accepted auth method (0x00 no-auth only yet)
-    writer.write_all(&[0x05u8, 0x00]).unwrap();
-    writer.flush().unwrap();
+    // // server send to client accepted auth method (0x00 no-auth only yet)
+    // writer.write_all(&[0x05u8, 0x00]).unwrap();
+    // writer.flush().unwrap();
 }
 
 fn parse_dst(reader: &mut TcpStream, atyp: u8) -> String {
@@ -110,7 +126,10 @@ fn handle_connection(stream: TcpStream) {
     let mut writer = stream;
     let mut buffer = vec![0u8; 512];
 
-    handshake(&mut reader, &mut writer);
+    if handshake(&mut reader, &mut writer).is_err() {
+        println!("hand shake error");
+        return;
+    }
 
     // Once the method-dependent subnegotiation has completed, the client
     // sends the request details.  If the negotiated method includes

@@ -153,7 +153,7 @@ fn handle_connection(stream: TcpStream) {
                 let mut buf = vec![0; 1024];
                 loop {
                     match reader.read(&mut buf) {
-                        Ok(0) => return,  
+                        Ok(0) => return, // With TcpStream instances, this signifies that the read half of the socket is closed.
                         Ok(n) => {
                             remote_writer.write(&buf[..n]).unwrap();
                         }

@@ -156,12 +156,17 @@ fn handle_connection(stream: TcpStream) {
                 let mut buf = vec![0; 1024];
                 loop {
                     match reader.read(&mut buf) {
-                        Ok(0) => return, // With TcpStream instances, this signifies that the read half of the socket is closed.
+                        Ok(0) => {
+                            // With TcpStream instances, this signifies that the read half of the socket is closed.
+                            remote_writer.flush().unwrap();
+                            break;
+                        }
                         Ok(n) => {
                             remote_writer.write_all(&buf[..n]).unwrap();
                         }
                         Err(e) => {
                             println!("reader error: {e:?}");
+                            break;
                         }
                     }
                 }
@@ -171,12 +176,16 @@ fn handle_connection(stream: TcpStream) {
             let mut buf = vec![0; 1024];
             loop {
                 match remote_reader.read(&mut buf) {
-                  Ok(0) => return,  
+                  Ok(0) => {
+                    writer.flush().unwrap();
+                    break;
+                  }  
                   Ok(n) => {
                     writer.write_all(&buf[..n]).unwrap();
                   }
                   Err(e) => {
                     println!("remote reader error: {e:?}");
+                    break;
                   }
                 }
             }

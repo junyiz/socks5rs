@@ -10,29 +10,22 @@ pub mod util;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    if args.len() < 2 {
+    let port = args.get(1).unwrap_or_else(|| {
         println!("usage: socks5rs [port]");
-        return;
-    }
-    let port = &args[1];
+        std::process::exit(1);
+    });
     let addr = format!("0.0.0.0:{}", port);
-    match TcpListener::bind(&addr) {
-        Ok(listener) => {
-            println!("socks5rs is running {}", &addr);
-            for stream in listener.incoming() {
-                match stream {
-                    Ok(stream) => {
-                        thread::spawn(move || handler(stream));
-                    }
-                    Err(e) => {
-                        println!("Error accepting client connection: {}", e);
-                    }
-                }
+    if let Ok(listener) = TcpListener::bind(&addr) {
+        println!("socks5rs is running {}", &addr);
+        for stream in listener.incoming() {
+            if let Ok(stream) = stream {
+                thread::spawn(move || handler(stream));
+            } else if let Err(e) = stream {
+                println!("Failed to accept: {e}");
             }
         }
-        Err(e) => {
-            println!("Error bind {} {}", &addr, e);
-        }
+    } else {
+        println!("Failed to bind {}", &addr);
     }
 }
 
@@ -176,7 +169,7 @@ fn handler(stream: TcpStream) {
         // Handle client traffic -> remote server
         let inbound_thread = thread::spawn(move || {
             if let Err(e) = copy(&mut reader, &mut remote_writer, "inbound") {
-                util::log("33", format!("inbound {} -> {}", peer_addr.to_string().as_str(), &dst).as_str(), e);
+                util::log("32", format!("inbound {} -> {}", peer_addr.to_string().as_str(), &dst).as_str(), e);
             }
         });
 

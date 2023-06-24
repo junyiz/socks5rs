@@ -3,6 +3,8 @@ use std::io::prelude::*;
 use std::net::{TcpListener, TcpStream, Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6, SocketAddr};
 use std::thread;
 
+use util::Color;
+
 pub mod util;
 
 // SOCKS Protocol Version 5
@@ -169,13 +171,13 @@ fn handler(stream: TcpStream) {
         // Handle client traffic -> remote server
         let inbound_thread = thread::spawn(move || {
             if let Err(e) = copy(&mut reader, &mut remote_writer, "inbound") {
-                util::log("32", format!("inbound {} -> {}", peer_addr.to_string().as_str(), &dst).as_str(), e);
+                util::log(Color::Magenta.as_str(), format!("inbound {} -> {}", peer_addr.to_string().as_str(), &dst).as_str(), e);
             }
         });
 
         // Handle remote server -> client traffic
         if let Err(e) = copy(&mut remote_reader, &mut writer, "outbound") {
-            util::log("31", format!("outbound {} <- {}", peer_addr.to_string().as_str(), &dst2).as_str(), e);
+            util::log(Color::Red.as_str(), format!("outbound {} <- {}", peer_addr.to_string().as_str(), &dst2).as_str(), e);
         }
 
         // Wait for inbound thread to finish
@@ -183,6 +185,6 @@ fn handler(stream: TcpStream) {
 
         Ok(())
     }) {
-        util::log("35", format!("Failed to connect {}: {}", addr, e).as_str(), e);
+        util::log(Color::Green.as_str(), format!("Failed to connect {}: {}", addr, e).as_str(), e);
     }
 }

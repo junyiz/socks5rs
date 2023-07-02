@@ -16,7 +16,7 @@ fn main() {
         println!("usage: socks5rs [port]");
         std::process::exit(1);
     });
-    let addr = format!("0.0.0.0:{}", port);
+    let addr = format!("0.0.0.0:{}", &port);
     if let Ok(listener) = TcpListener::bind(&addr) {
         println!("socks5rs is running {}", &addr);
         for stream in listener.incoming() {
